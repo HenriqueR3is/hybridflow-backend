@@ -25,6 +25,8 @@ class ReservationController extends Controller
 
         $validated = $validator->validated();
 
+        \Log::info($validated);
+
         //REGRA: não pode conflito de horário
         $conflict = Reservation::where('room_id', $validated['room_id'])
             ->where(function ($query) use ($validated) {
@@ -32,12 +34,19 @@ class ReservationController extends Controller
                     ->where('end_time', '>', $validated['start_time']);
             })
             ->exists();
-
+        
         if ($conflict) {
-            return response()->json([
-                'message' => 'Sala já está reservada nesse horário'
-            ], 409);
-        }
+
+    $availableRooms = \App\Models\Room::whereDoesntHave('reservations', function ($query) use ($validated) {
+        $query->where('start_time', '<', $validated['end_time'])
+            ->where('end_time', '>', $validated['start_time']);
+    })->get();
+
+    return response()->json([
+        'message' => 'Sala já está reservada nesse horário',
+        'available_rooms' => $availableRooms
+    ], 409);
+}
 
         $reservation = Reservation::create($validated);
 
@@ -123,6 +132,26 @@ class ReservationController extends Controller
 
         return response()->json([
             'message' => 'Reserva deletada com sucesso'
+        ]);
+    }
+
+    public function suggestions(Request $request)
+    {
+        $validated = $request->validate([
+            'room_id' => 'required|exists:rooms,id',
+            'start_time' => 'required|date',
+            'end_time' => 'required|date|after:start_time'
+        ]);
+
+        // 1. buscar salas sem conflito nesse horário
+        $availableRooms = \App\Models\Room::whereDoesntHave('reservations', function ($query) use ($validated) {
+            $query->where('start_time', '<', $validated['end_time'])
+                ->where('end_time', '>', $validated['start_time']);
+        })->get();
+
+        return response()->json([
+            'message' => 'Sugestões encontradas',
+            'available_rooms' => $availableRooms
         ]);
     }
 }

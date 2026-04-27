@@ -12,6 +12,8 @@ function App() {
   const [roomId, setRoomId] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [message, setMessage] = useState("");
 
   const fetchRooms = () => {
     fetch("http://127.0.0.1:8000/api/rooms")
@@ -95,13 +97,20 @@ function App() {
     });
 
     if (response.status === 201) {
-      alert("Reserva criada com sucesso");
+      setMessage("Reserva criada com sucesso!");
+      setSuggestions([]);
     } else if (response.status === 409) {
-      alert("Conflito de horário!");
+      const data = await response.json();
+
+      console.log("CONFLICT DATA:", data);
+
+      setMessage(data.message);
+
+      setSuggestions(data.available_rooms || []);
     } else if (response.status === 422) {
-      alert("Dados inválidos");
-    } else {
-      alert("Erro inesperado");
+      const error = await response.json();
+      console.log(error);
+      setMessage("Dados inválidos");
     }
   };
 
@@ -168,6 +177,52 @@ function App() {
             Criar Reserva
           </button>
         </form>
+
+        {message && (
+          <p
+            className={`mt-3 p-2 rounded-lg text-sm ${
+              message.includes("sucesso")
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+            }`}
+          >
+            {message}
+          </p>
+        )}
+
+        {message && message.includes("reservada") && (
+          <div style={{ marginTop: "20px" }}>
+            <h3>Salas disponíveis:</h3>
+
+            {suggestions.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <h3 className="font-semibold text-blue-700 mb-2">
+                  Sugestões disponíveis
+                </h3>
+
+                <ul className="space-y-2">
+                  {suggestions.map((room) => (
+                    <li
+                      key={room.id}
+                      className="flex justify-between items-center bg-white p-2 rounded shadow-sm"
+                    >
+                      <span>
+                        {room.name} (cap: {room.capacity})
+                      </span>
+
+                      <button
+                        onClick={() => setRoomId(room.id)}
+                        className="bg-blue-500 text-white px-2 py-1 rounded"
+                      >
+                        Usar
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* LISTA */}
         <ul className="mt-6 space-y-2">
